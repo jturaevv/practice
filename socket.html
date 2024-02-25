@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    .parent {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      min-height: 100vh;
+      background: #000;
+    }
+
+    .actions {
+      display: flex;
+      gap: 15px;
+    }
+
+    .actions button {
+      padding: 10px 20px;
+      font-size: 16px;
+      color: #fff;
+      font-weight: 700;
+      background: orange;
+      cursor: pointer;
+      border: #fff;
+      border-radius: 6px;
+    }
+
+    .actions button:disabled {
+      filter: grayscale(100);
+      cursor: not-allowed;
+    }
+
+    .response {
+      padding: 24px;
+      background: #fff;
+      min-width: 400px;
+      max-width: 95vw;
+      margin-bottom: 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: 0.2s ease;
+      word-break: break-all;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="parent">
+    <pre id="response" class="response">
+    </pre>
+    <div class="actions">
+      <button onclick="getList()">Get list</button>
+      <button id="loadKey" onclick="loadKey()" disabled>Load key</button>
+      <button onclick="submit()">Create pkcs7</button>
+    </div>
+  </div>
+
+  <script src="script/javascript/socket.js"></script>
+  <script>
+    let certificate
+    let keyId
+
+    function displayResponse(value) {
+      document.getElementById('response').textContent = JSON.stringify(value, null, 2)
+    }
+
+    function getList() {
+      const payload = {
+        plugin: "pfx",
+        name: "list_all_certificates"
+      }
+
+      socket.send(JSON.stringify(payload))
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+
+        if (!data.success) return
+
+        certificate = data.certificates.find(({ name }) => name === 'ЮЛ - PREMIUM AESTHETICS ACADEMY - 309 101 982')
+        displayResponse(certificate)
+
+        if (certificate) {
+          document.getElementById('loadKey').disabled = false
+        }
+      }
+    }
+
+    function loadKey() {
+      const payload = {
+        plugin: "pfx",
+        name: "load_key",
+        arguments: [
+          certificate.disk,
+          certificate.path,
+          certificate.name,
+          certificate.alias,
+        ]
+      }
+
+      socket.send(JSON.stringify(payload))
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        keyId = data.keyId
+
+        displayResponse(keyId)
+
+      }
+    }
+
+    function submit() {
+      const payload = {
+        plugin: "pkcs7",
+        name: "create_pkcs7",
+        arguments: [
+          "eyJpZCI6MTQyMDA2MywiZGlnZXN0X2lkIjoiOGMzMWQ3ZjEtYmY3Mi00OTZkLThjNTUtNjViZjkzNGFmNmI5IiwiZGlnZXN0Ijoie1wic3Vic2NyaWJlclwiOntcInR6XCI6bnVsbCxcInRlYW1fdHlwZVwiOlwicGxheWVyXCIsXCJ0ZWFtX3N0YXR1c1wiOlwiYWN0aXZlXCIsXCJ0ZWFtX3JvbGVcIjpcInNlbGxlclwiLFwidGVhbV9uYW1lXCI6XCJQUkVNSVVNIEFFU1RIRVRJQ1MgQUNBREVNWSBNQ0hKXCIsXCJ0ZWFtX21ldGFcIjp7XCJ0cnVzdGVkX2FjY2VwdF9pbmNvbWVcIjpbMjE5NTZdfSxcInRlYW1faW5uXCI6XCIzMDkxMDE5ODJcIixcInRlYW1faWRcIjoxODYwNSxcInN0YXR1c1wiOlwiYWN0aXZlXCIsXCJyb2xlc1wiOltcInNlbGxlcl9jb21wYW55X2FkbWluXCJdLFwicm9sZV9jb2RlXCI6XCJ1c2VyXCIsXCJyb2xlXCI6XCJjcmVhdG9yXCIsXCJuYW1lXCI6XCJHVUxZQU1PViBBTUFMIExBWklaT1ZJQ0hcIixcIm1ldGFcIjp7XCJpc19lY3BfcmVxdWlyZWRcIjp0cnVlfSxcImxvZ2luXCI6XCJwcmVtaXVtYWVzdGhldGljc0BpbnRlcm5ldC5ydVwiLFwibG9jYWxlXCI6bnVsbCxcImxhc3RfbmFtZVwiOlwiR1VMWUFNT1ZcIixcImxhc3RfY2hhbmdlX3Bhc3N3b3JkX2RhdGVcIjpudWxsLFwiaWRcIjoyMTk1NixcImZpcnN0X25hbWVcIjpcIkFNQUxcIixcImZhY2VfaWRcIjotMjE1MzMsXCJleHRlcm5hbF90ZWFtXCI6ZmFsc2UsXCJleHBcIjoxNjgzNTQyNzYyLFwiY29tcGFueV9yb2xlXCI6XCJzZWxsZXJcIn0sXCJwcm9jX2lkXCI6MTQyMDA2MyxcInBhcmFtc1wiOnt9LFwibG90c1wiOnt9LFwiaXRlbXNcIjp7fSxcImZpZWxkc1wiOntcInllYXJcIjoyMDIzLFwidW5pdFwiOlwi0YjRglwiLFwicmVnaW9uc1wiOltcIjMzXCJdLFwicHVibGljYXRlX2F0XCI6bnVsbCxcInByb2R1Y3RcIjp7XCJ1bml0XCI6XCLRiNGCXCIsXCJ0eXBlXCI6MSxcInNvdXJjZVwiOlwia3RydVwiLFwicHJvZHVjdF9wcm9wZXJ0aWVzXCI6W3tcInZhbF9uYW1lXCI6XCLRiNGCXCIsXCJwcm9wX25hbWVcIjpcItCV0LTQuNC90LjRhtCwINC40LfQvNC10YDQtdC90LjRj1wifV0sXCJwcm9kdWN0X25hbWVcIjpcItCf0YDQvtCx0LrQsCDQv9C70LDRgdGC0LzQsNGB0YHQvtCy0LDRj1wiLFwicHJvZHVjdF9pZFwiOlwiMjIuMjkuMjkuMDAwLTAwMDAxXCIsXCJjYXRlZ29yeVwiOntcInZlcnNpb25cIjpcIlwiLFwidWlkXCI6XCJiMDc4Y2RjOS0wYmNkLTQ3NDMtYTkwMy0wYzY5NjJkNzhhMzZcIixcInRyYW5zbGF0aW9uc1wiOlt7XCJ1cGRhdGVkX2F0XCI6bnVsbCxcInRpdGxlXCI6XCJPdGhlciBwbGFzdGljcyBwcm9kdWN0c1wiLFwibG9jYWxlXCI6XCJlblwiLFwiaWRcIjo2MTQwMCxcImNyZWF0ZWRfYXRcIjpudWxsLFwiY2F0ZWdvcnlfaWRcIjoyMDI5NX0se1widXBkYXRlZF9hdFwiOm51bGwsXCJ0aXRsZVwiOlwi0JjQt9C00LXQu9C40Y8g0L",
+          keyId,
+          "no",
+        ],
+      };
+
+      socket.send(JSON.stringify(payload))
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+
+        displayResponse(data)
+      };
+    }
+  </script>
+</body>
+
+</html>
